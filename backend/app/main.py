@@ -19,35 +19,32 @@ app.add_middleware(
 
 app.include_router(router, prefix=settings.API_V1_STR)
 
-def event_handler(event):
+async def event_handler(event):
     # Update global stats
     stats["total_packets"] += 1
     if event["prediction"] == "ATTACK":
         stats["total_threats"] += 1
         stats["severity_counts"][event["severity"]] += 1
-    
+
     # Store history
     history.append(event)
     if len(history) > 100:
         history.pop(0)
-    
-    # Broadcast to frontend
-    asyncio.run_coroutine_threadsafe(manager.broadcast(event), loop)
 
-sniffer = SnifferService(event_handler)
-simulator = SimulationService(event_handler)
+    # Broadcast to all connected frontend clients
+    await manager.broadcast(event)
+
+async def simulation_loop():
+    service = SimulationService(event_handler)
+    await service.start()
 
 @app.on_event("startup")
 async def startup_event():
-    global loop
-    loop = asyncio.get_event_loop()
-    # sniffer.start()  # Uncomment for live sniffing
-    asyncio.create_task(simulator.start()) # Default to simulator for demo safety
+    asyncio.create_task(simulation_loop())
 
 @app.on_event("shutdown")
-def shutdown_event():
-    sniffer.stop()
-    simulator.stop()
+async def shutdown_event():
+    pass
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

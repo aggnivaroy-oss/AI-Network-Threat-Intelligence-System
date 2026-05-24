@@ -3,19 +3,19 @@ import time
 import asyncio
 
 class SimulationService:
-    def __init__(self, event_callback):
-        self.callback = event_callback
+    def __init__(self, callback):
+        self.callback = callback
         self.is_running = False
 
     async def start(self):
         self.is_running = True
         ips = ["192.168.1.10", "192.168.1.15", "10.0.0.5", "172.16.0.20"]
-        
+
         while self.is_running:
             is_attack = random.random() < 0.2
             src = random.choice(ips)
             dst = "192.168.1.1"
-            
+
             if is_attack:
                 severity = random.choice(["MEDIUM", "HIGH", "CRITICAL"])
                 attack_type = random.choice(["DoS Attack", "Brute Force", "Port Scan"])
@@ -41,8 +41,13 @@ class SimulationService:
                     "serror_rate": random.uniform(0, 1) if is_attack else 0
                 }
             }
-            
-            self.callback(event)
+
+            # Support both async and sync callbacks
+            if asyncio.iscoroutinefunction(self.callback):
+                await self.callback(event)
+            else:
+                self.callback(event)
+
             await asyncio.sleep(2)
 
     def stop(self):
